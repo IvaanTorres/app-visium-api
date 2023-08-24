@@ -6,14 +6,13 @@ services:
       - db
     build:
       context: .
-      target: dev
+      target: prod
     ports:
       - "8000:8000"
-    volumes:
-      - .:/app
 
   db:
     image: postgres:13-alpine
+    container_name: db
     volumes:
       - ./db-data/:/var/lib/postgresql/data
     restart: always

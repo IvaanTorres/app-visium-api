@@ -8,7 +8,9 @@
     "release:patch": "git add . && standard-version -a --no-verify --release-as patch",
     "release:minor": "git add . && standard-version -a --no-verify --release-as minor",
     "release:major": "git add . && standard-version -a --no-verify --release-as major",
-    "release:dry": "git add . && standard-version -a --dry-run --no-verify"
+    "release:dry": "git add . && standard-version -a --dry-run --no-verify",
+    "docker:start": "docker image prune -f && docker-compose -f ./docker-compose.dev.yml down && docker-compose -f ./docker-compose.dev.yml up --build --remove-orphans",
+    "docker:build": "docker image prune -f && docker-compose -f ./docker-compose.prod.yml down && docker-compose -f ./docker-compose.prod.yml up --build --remove-orphans"
   },
   "repository": {
     "type": "git",
