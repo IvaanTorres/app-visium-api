@@ -4,7 +4,11 @@
   "description": "App Visium API",
   "main": "index.js",
   "scripts": {
-    "prepare": "husky install"
+    "prepare": "husky install",
+    "release:patch": "git add . && standard-version -a --no-verify --release-as patch",
+    "release:minor": "git add . && standard-version -a --no-verify --release-as minor",
+    "release:major": "git add . && standard-version -a --no-verify --release-as major",
+    "release:dry": "git add . && standard-version -a --dry-run --no-verify"
   },
   "repository": {
     "type": "git",
@@ -15,5 +19,9 @@
   "bugs": {
     "url": "https://github.com/IvaanTorres/app-visium-api/issues"
   },
-  "homepage": "https://github.com/IvaanTorres/app-visium-api#readme"
+  "homepage": "https://github.com/IvaanTorres/app-visium-api#readme",
+  "devDependencies": {
+    "husky": "^8.0.3",
+    "standard-version": "^9.5.0"
+  }
 }
