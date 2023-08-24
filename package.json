@@ -1,0 +1,22 @@
+{
+  "name": "app-visium-api",
+  "version": "1.0.0",
+  "description": "# Installation for dev ```bash pip install pipenv pipenv shell pipenv install pipenv run start ```",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IvaanTorres/app-visium-api.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/IvaanTorres/app-visium-api/issues"
+  },
+  "homepage": "https://github.com/IvaanTorres/app-visium-api#readme",
+  "devDependencies": {
+    "husky": "^8.0.3"
+  }
+}
