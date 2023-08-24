@@ -2,8 +2,10 @@
 
 # Installation for dev
 ```bash
-pip install pipenv
-pipenv shell
-pipenv install
-pipenv run start
+npm run docker:start
+```
+
+# Run commands of dependencies (Alembic, etc)
+```bash
+docker exec -it <container-name> <command>
 ```

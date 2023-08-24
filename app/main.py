@@ -5,7 +5,7 @@ app = FastAPI()
 
 @app.get("/")
 async def root():
-    return {"message": "Hello World"}
+    return {"message": "Hello Wdededeorld"}
 
 @app.post('/categories/{categoryId}')
 async def getCategory(categoryId: int):
