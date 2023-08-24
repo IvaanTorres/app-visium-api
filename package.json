@@ -1,0 +1,19 @@
+{
+  "name": "app-visium-api",
+  "version": "0.0.0",
+  "description": "App Visium API",
+  "main": "index.js",
+  "scripts": {
+    "prepare": "husky install"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/IvaanTorres/app-visium-api.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/IvaanTorres/app-visium-api/issues"
+  },
+  "homepage": "https://github.com/IvaanTorres/app-visium-api#readme"
+}
