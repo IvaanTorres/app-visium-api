@@ -1,15 +1,44 @@
+# from models.User import RegistrationData
 from fastapi import FastAPI
 import uvicorn
-# from db.config import engine
+from sqlalchemy import create_engine, Column, String
 import hmac
 import base64
 import json
 import hashlib
 from typing import Dict
 import datetime
+from pydantic import BaseModel
+from typing import Optional
+
+class RegistrationData(BaseModel):
+    username: str
+    password: str
+    email: str
 import secrets
+# from db.config import SessionLocal, Base, engine
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
+
+DATABASE_URL = "postgresql://root:root@db:5432/visium"
+
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
 
 app = FastAPI()
+
+class User(Base):
+    __tablename__ = "users"
+
+    username = Column(String, primary_key=True, index=True)
+    password = Column(String(length=100))
+    email = Column(String, index=True)
+
+# Base.metadata.create_all(bind=engine)
 
 # ---------------------------------- SECRETS --------------------------------- #
 def generate_secret_key():
@@ -114,6 +143,28 @@ def generate_jwt(duration: int = 1):
     # hashed_password = hash_password(password)
     # validated_password = validate_password(password, hashed_password)
     # print(validated_password)
+
+@app.post("/register")
+def register(user: RegistrationData):
+    session = SessionLocal()
+    # Check if the user already exists (username or email)
+    if session.query(User).filter(User.username == user.username).first():
+        raise HTTPException(status_code=400, detail="Username already taken")
+    
+    if session.query(User).filter(User.email == user.email).first():
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Generate a random salt and hash the password
+    salt = secrets.token_hex(16)
+    hashed_password = hash_password(user.password, salt)
+
+    # Store the user data (replace this with actual database storage)
+    user = User(username=user.username, password=hashed_password, email=user.email)
+    session.add(user)
+    session.commit()
+    session.close()
+
+    return {"message": "User registered successfully"}
 
 # Server running 
 if __name__ == "__main__ ":
