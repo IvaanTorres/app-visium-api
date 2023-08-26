@@ -2,6 +2,7 @@ FROM python:3.9-slim as main
 WORKDIR /app
 EXPOSE 8000
 RUN pip install psycopg2-binary
+RUN export PYTHONPATH='.'
 
 
 FROM main as prod
