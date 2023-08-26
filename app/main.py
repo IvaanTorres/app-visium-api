@@ -68,11 +68,19 @@ def validate_jwt(token, secret):
         return False
 
 # --------------------------------- PASSWORD --------------------------------- #
-def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+def hash_password(password: str, salt: str = None) -> str:
+    if salt is None:
+        salt = secrets.token_hex(16)  # Generate a random salt
 
-def validate_password(password: str, hashed_password: str) -> bool:
-    return hash_password(password) == hashed_password
+    salted_password = password + salt
+
+    hashed_password = hashlib.sha256(salted_password.encode("utf-8")).hexdigest()
+    return f"{salt}${hashed_password}"
+
+def validate_password(password: str, stored_hashed_password: str) -> bool:
+    stored_salt, hashed_password = stored_hashed_password.split('$')
+    hashed_input_password = hash_password(password, stored_salt)
+    return hashed_input_password == stored_hashed_password
 
 
 @app.get("/")
@@ -91,7 +99,7 @@ def generate_jwt(duration: int = 1):
         "exp": int(expiration_time.timestamp())
     }
 
-    # IMPORTANT: Store the random secret into secure secrets management system or a secure database as HashiCorp Vault, AWS Secrets Manager, or a secure database
+    # IMPORTANT: Store the random secret into secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
     secret = generate_secret_key()
     jwt = create_jwt(header, payload, secret)
     validated_jwt = validate_jwt(jwt, secret)
