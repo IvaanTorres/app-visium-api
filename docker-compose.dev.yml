@@ -16,7 +16,7 @@ services:
     image: postgres:13-alpine
     container_name: db
     volumes:
-      - db-data:/var/lib/postgresql/data
+      - db-data-dev:/var/lib/postgresql/data
     restart: always
     environment:
       - POSTGRES_DB=visium
@@ -27,7 +27,7 @@ services:
 
 networks: 
   default:
-    name: app-visium-network-api
+    name: app-visium-network
 
 volumes:
-  db-data:
+  db-data-dev:
