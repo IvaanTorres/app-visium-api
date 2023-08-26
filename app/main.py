@@ -1,16 +1,112 @@
 from fastapi import FastAPI
 import uvicorn
+# from db.config import engine
+import hmac
+import base64
+import json
+import hashlib
+from typing import Dict
+import datetime
+import secrets
 
 app = FastAPI()
 
-@app.get("/")
-async def root():
-    return {"message": "Hello Wdededeorld"}
+# ---------------------------------- SECRETS --------------------------------- #
+def generate_secret_key():
+    # Random URL-safe string of 32 bytes
+    return secrets.token_urlsafe(32)
 
-@app.post('/categories/{categoryId}')
-async def getCategory(categoryId: int):
-    return {"category", categoryId}
+# ------------------------------------ JWT ----------------------------------- #
+def encode_base64(data: bytes) -> str:
+    base64_bytes = base64.urlsafe_b64encode(data)
+    return base64_bytes.decode('ascii').rstrip("=")
+
+def generate_jwt_signature(secret_key, data):
+    signature = hmac.new(secret_key.encode('utf-8'), data.encode('utf-8'), hashlib.sha256)
+    return base64.urlsafe_b64encode(signature.digest()).decode('utf-8')
+
+def create_jwt(header: Dict, payload: Dict, secret: str) -> str:
+    encoded_header = encode_base64(json.dumps(header).encode('utf-8'))
+    encoded_payload = encode_base64(json.dumps(payload).encode('utf-8'))
+
+    signature_input = f"{encoded_header}.{encoded_payload}"
+    signature = generate_jwt_signature(secret, signature_input)
+    encoded_signature = encode_base64(signature.encode('utf-8'))
+
+    jwt = f"{encoded_header}.{encoded_payload}.{encoded_signature}"
+    return jwt
+
+def validate_jwt(token, secret):
+    try:
+        # Split the token into its header and payload
+        header_base64, payload_base64, signature = token.split(".")
+
+        # Decode the header and payload
+        header = json.loads(base64.urlsafe_b64decode(header_base64 + "==").decode("utf-8"))
+        payload = json.loads(base64.urlsafe_b64decode(payload_base64 + "==").decode("utf-8"))
+        # Verify the signature
+        encoded_signature_input = f"{header_base64}.{payload_base64}"
+        expected_signature = generate_jwt_signature(secret, encoded_signature_input)
+        actual_signature = base64.urlsafe_b64decode(signature + "==")
+
+
+        if not hmac.compare_digest(expected_signature.encode('utf-8'), actual_signature):
+            print("Invalid signature")
+            return False
+        
+        print("Valid signature")
+
+        # Check expiration
+        current_time = datetime.datetime.utcnow()
+        if payload.get("exp") and current_time > datetime.datetime.fromtimestamp(payload["exp"]):
+            print("Token has expired")
+            return False
+
+        return True
+    except:
+        print("Invalid token")
+        return False
+
+# --------------------------------- PASSWORD --------------------------------- #
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.encode("utf-8")).hexdigest()
+
+def validate_password(password: str, hashed_password: str) -> bool:
+    return hash_password(password) == hashed_password
+
+
+@app.get("/")
+def generate_jwt(duration: int = 1):
+
+    # TODO: JWT (HMAC-SHA256 MAC)
+    current_time = datetime.datetime.utcnow()
+    expiration_time = current_time + datetime.timedelta(hours=duration)
+
+    header = {
+        "alg": "HS256", 
+        "typ": "JWT"     
+    }
+    payload = {
+        "sub": "user123",
+        "exp": int(expiration_time.timestamp())
+    }
+
+    # IMPORTANT: Store the random secret into secure secrets management system or a secure database as HashiCorp Vault, AWS Secrets Manager, or a secure database
+    secret = generate_secret_key()
+    jwt = create_jwt(header, payload, secret)
+    validated_jwt = validate_jwt(jwt, secret)
+
+    return {
+        "jwt": jwt,
+        "validated_jwt": validated_jwt
+    }
+
+    # TODO: PASSWORD (HASHING)
+    # password = "123456"
+    # hashed_password = hash_password(password)
+    # validated_password = validate_password(password, hashed_password)
+    # print(validated_password)
 
 # Server running 
 if __name__ == "__main__ ":
-    uvicorn.run(app, host="127.0.0.1", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
