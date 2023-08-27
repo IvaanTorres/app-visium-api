@@ -479,6 +479,33 @@ def get_general_settings(request: Request):
     except Exception as e:
         return {"error": e}
 
+@app.get("/settings/language")
+def get_language_settings(request: Request):
+    try:
+        refresh_token_with_bearer = request.headers["Authorization"]
+        refresh_token = refresh_token_with_bearer.split(" ")[1]
+
+        refresh_token_payload = check_access(refresh_token, SECRET_KEY)
+
+        if refresh_token_payload:
+            user_id = refresh_token_payload["user_id"]
+
+            session = SessionLocal()
+            storedUser = session.query(User).filter(User.id == user_id).first()
+            if not storedUser:
+                raise HTTPException(status_code=400, detail="User does not exist")
+
+            storedPreference = session.query(Preference).filter(Preference.user_id == user_id).first()
+
+            session.close()
+
+            return {
+                "message": "User language settings retrieved successfully",
+                "locale": storedPreference.locale
+            }
+
+    except Exception as e:
+        return {"error": e}
 
 # Server running 
 if __name__ == "__main__ ":
