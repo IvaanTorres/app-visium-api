@@ -53,7 +53,7 @@ def validate_jwt(token, secret):
         user_id = payload.get("user_id")
         if user_id:
             db = SessionLocal()
-            linked_token = db.query(Token).filter(Token.user_id == user_id).first()
+            linked_token = db.query(Token).filter(Token.token == token).first()
             db.close()
             if linked_token.is_revoked:
                 print("Token has been revoked")
