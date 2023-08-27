@@ -13,7 +13,7 @@ from .db.schemas.Login import Login
 from .db.schemas.Preference import Preference
 from .db.config import SessionLocal, engine, Base
 from fastapi.responses import JSONResponse
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
 # Since I am not able to access for the specific user secret key, I'll use the same for everyone.
@@ -277,20 +277,16 @@ def delete_account(request: Request):
 
 def check_access(access_token: str):
     current_time = datetime.utcnow()
-    # Create an expired date
-    expiration_time = current_time + datetime.timedelta(minutes=0)
+    expiration_time = current_time + timedelta(minutes=0)
 
-    expiration_time = expiration_time.strftime('%Y-%m-%dT%H:%M:%S.%fZ')  # Convert to ISO 8601 format
     new_token = create_jwt(
         header,
         {
             "sub": "test",
-            "exp": expiration_time
+            "exp": int(expiration_time.timestamp())
         },
         user_secret
     )
-
-    print(new_token)
 
     validated = validate_jwt(new_token, user_secret)
     print('isokay?', validated)
