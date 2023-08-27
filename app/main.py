@@ -13,7 +13,7 @@ from .db.schemas.Login import Login
 from .db.schemas.Preference import Preference
 from .db.config import SessionLocal, engine, Base
 from fastapi.responses import JSONResponse
-from datetime import datetime, timedelta
+import datetime
 
 # A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
 # Since I am not able to access for the specific user secret key, I'll use the same for everyone.
@@ -237,11 +237,11 @@ def logout(request: Request):
     response.delete_cookie(key="x-refresh-token")  # Clear the cookie
     return response
 
-@app.post("/delete-account")
+@app.get("/")
 def delete_account(request: Request):
 
-    current_time = datetime.utcnow()
-    expiration_time = current_time + timedelta(hours=15)
+    current_time = datetime.datetime.utcnow()
+    expiration_time = current_time + datetime.timedelta(hours=15)
 
     header = {
         "alg": "HS256", 
@@ -255,6 +255,7 @@ def delete_account(request: Request):
     # IMPORTANT: Store the random secret into secure secrets management system or a secure database as HashiCorp Vault, AWS Secrets Manager, or a secure database
     secret = generate_secret_key()
     jwt = create_jwt(header, payload, secret)
+    print(jwt, secret)
     validated_jwt = validate_jwt(jwt, secret)
 
     return {
