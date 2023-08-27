@@ -1,119 +1,100 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 import uvicorn
-# from db.config import engine
-import hmac
-import base64
-import json
-import hashlib
-from typing import Dict
-import datetime
-import secrets
+from .shared.helpers.jwt import create_jwt, validate_jwt
+from .shared.helpers.hash import hash, validate_hash, createSalt
+from .shared.helpers.secrets import generate_secret_key
+from .shared.constants.jwt import header
+from .shared.helpers.date import calculate_future_time
+from .models.User import UserModel
+from .db.schemas.User import User
+from .db.schemas.Token import Token
+from .db.schemas.Login import Login
+from .db.schemas.Preference import Preference
+from .db.config import SessionLocal, engine, Base
 
+# Create the FastAPI instance
 app = FastAPI()
 
-# ---------------------------------- SECRETS --------------------------------- #
-def generate_secret_key():
-    # Random URL-safe string of 32 bytes
-    return secrets.token_urlsafe(32)
+# Run migrations
+Base.metadata.create_all(bind=engine)
 
-# ------------------------------------ JWT ----------------------------------- #
-def encode_base64(data: bytes) -> str:
-    base64_bytes = base64.urlsafe_b64encode(data)
-    return base64_bytes.decode('ascii').rstrip("=")
+# Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
+@app.post("/register")
+def register(data: dict):
+    session = SessionLocal()
 
-def generate_jwt_signature(secret_key, data):
-    signature = hmac.new(secret_key.encode('utf-8'), data.encode('utf-8'), hashlib.sha256)
-    return base64.urlsafe_b64encode(signature.digest()).decode('utf-8')
+    userModel = UserModel(**data)
 
-def create_jwt(header: Dict, payload: Dict, secret: str) -> str:
-    encoded_header = encode_base64(json.dumps(header).encode('utf-8'))
-    encoded_payload = encode_base64(json.dumps(payload).encode('utf-8'))
-
-    signature_input = f"{encoded_header}.{encoded_payload}"
-    signature = generate_jwt_signature(secret, signature_input)
-    encoded_signature = encode_base64(signature.encode('utf-8'))
-
-    jwt = f"{encoded_header}.{encoded_payload}.{encoded_signature}"
-    return jwt
-
-def validate_jwt(token, secret):
+    # Validate the data
     try:
-        # Split the token into its header and payload
-        header_base64, payload_base64, signature = token.split(".")
-
-        # Decode the header and payload
-        header = json.loads(base64.urlsafe_b64decode(header_base64 + "==").decode("utf-8"))
-        payload = json.loads(base64.urlsafe_b64decode(payload_base64 + "==").decode("utf-8"))
-        # Verify the signature
-        encoded_signature_input = f"{header_base64}.{payload_base64}"
-        expected_signature = generate_jwt_signature(secret, encoded_signature_input)
-        actual_signature = base64.urlsafe_b64decode(signature + "==")
-
-
-        if not hmac.compare_digest(expected_signature.encode('utf-8'), actual_signature):
-            print("Invalid signature")
-            return False
+        if not userModel.username:
+            raise HTTPException(status_code=400, detail="Username is required")
+        if not userModel.password:
+            raise HTTPException(status_code=400, detail="Password is required")
+        if not userModel.email:
+            raise HTTPException(status_code=400, detail="Email is required")
+        if session.query(User).filter(User.username == userModel.username).first():
+            raise HTTPException(status_code=400, detail="Username already exists")
+        if session.query(User).filter(User.email == userModel.email).first():
+            raise HTTPException(status_code=400, detail="Email already exists")
+        if any(char in userModel.username for char in "<>&%${}'\"\\/()"):
+            raise HTTPException(status_code=400, detail="Username contains invalid characters")
+        if any(char in userModel.password for char in "<>&%${}'\"\\/()"):
+            raise HTTPException(status_code=400, detail="Password contains invalid characters")
+        if any(char in userModel.email for char in "<>&%${}'\"\\/()"):
+            raise HTTPException(status_code=400, detail="Email contains invalid characters")
         
-        print("Valid signature")
+    except Exception as e:
+        return {"error": e}
+    
+    # Hash the password
+    salt = createSalt(16)
+    hashed_password = hash(userModel.password, salt)
 
-        # Check expiration
-        current_time = datetime.datetime.utcnow()
-        if payload.get("exp") and current_time > datetime.datetime.fromtimestamp(payload["exp"]):
-            print("Token has expired")
-            return False
+    # Generate the secret key for both tokens
+    # A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
+    user_secret = generate_secret_key()
+    # Generate the access token
+    access_expiration_time = 15 # 15 minutes
+    access_token = create_jwt(
+        header, 
+        {
+            "sub": userModel.username, 
+            "exp": calculate_future_time(access_expiration_time)
+        }, 
+        user_secret
+    )
 
-        return True
-    except:
-        print("Invalid token")
-        return False
+    # Generate the refresh token
+    refresh_expiration_time = 60 * 24 * 7 # 1 week
+    refresh_token = create_jwt(
+        header, 
+        {
+            "sub": userModel.username, 
+            "exp": calculate_future_time(refresh_expiration_time)
+        }, 
+        user_secret
+    )
 
-# --------------------------------- PASSWORD --------------------------------- #
-def hash_password(password: str, salt: str = None) -> str:
-    if salt is None:
-        salt = secrets.token_hex(16)  # Generate a random salt
+    # Set and store the user data, their token, their preferences, and their login count
+    user = User(username=userModel.username, password=hashed_password, email=userModel.email)
+    token = Token(token=refresh_token, user=user)
+    login = Login(nb_logins=1, user=user)
+    # TODO: Get the user's locale from the request (manage the UI select state)
+    preference = Preference(locale="en_EN", user=user)
 
-    salted_password = password + salt
-
-    hashed_password = hashlib.sha256(salted_password.encode("utf-8")).hexdigest()
-    return f"{salt}${hashed_password}"
-
-def validate_password(password: str, stored_hashed_password: str) -> bool:
-    stored_salt, hashed_password = stored_hashed_password.split('$')
-    hashed_input_password = hash_password(password, stored_salt)
-    return hashed_input_password == stored_hashed_password
-
-
-@app.get("/")
-def generate_jwt(duration: int = 1):
-
-    # TODO: JWT (HMAC-SHA256 MAC)
-    current_time = datetime.datetime.utcnow()
-    expiration_time = current_time + datetime.timedelta(hours=duration)
-
-    header = {
-        "alg": "HS256", 
-        "typ": "JWT"     
-    }
-    payload = {
-        "sub": "user123",
-        "exp": int(expiration_time.timestamp())
-    }
-
-    # IMPORTANT: Store the random secret into secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
-    secret = generate_secret_key()
-    jwt = create_jwt(header, payload, secret)
-    validated_jwt = validate_jwt(jwt, secret)
+    session.add(user)
+    session.add(token)
+    session.add(login)
+    session.add(preference)
+    session.commit()
+    session.close()
 
     return {
-        "jwt": jwt,
-        "validated_jwt": validated_jwt
+        "message": "User registered successfully",
+        "access_token": access_token,
+        "refresh_token": refresh_token
     }
-
-    # TODO: PASSWORD (HASHING)
-    # password = "123456"
-    # hashed_password = hash_password(password)
-    # validated_password = validate_password(password, hashed_password)
-    # print(validated_password)
 
 # Server running 
 if __name__ == "__main__ ":
