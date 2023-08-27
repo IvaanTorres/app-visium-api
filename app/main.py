@@ -49,7 +49,7 @@ Base.metadata.create_all(bind=engine)
 def register(data: dict):
     session = SessionLocal()
 
-    userModel = UserModel(**data)
+    userModel = UserModel(username=data["username"], password=data["password"], email=data["email"])
 
     # Validate the data
     password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})"
@@ -92,7 +92,7 @@ def register(data: dict):
     # A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
     # user_secret = generate_secret_key()
     # Generate the access token
-    access_expiration_time = 15 # 15 minutes
+    access_expiration_time = 1
     access_token = create_jwt(
         header, 
         {
@@ -103,7 +103,7 @@ def register(data: dict):
     )
 
     # Generate the refresh token
-    refresh_expiration_time = 60 * 24 * 7 # 1 week
+    refresh_expiration_time = 24
     refresh_token = create_jwt(
         header, 
         {
@@ -115,8 +115,8 @@ def register(data: dict):
 
     token = Token(token=refresh_token, user=user)
     login = Login(nb_logins=1, user=user)
-    # TODO: Get the user's locale from the request (manage the UI select state)
-    preference = Preference(locale="en_EN", user=user)
+    preference = Preference(locale=data["locale"], user=user)
+
     session.add(token)
     session.add(login)
     session.add(preference)
@@ -140,7 +140,12 @@ def register(data: dict):
 def login(data: dict):
     session = SessionLocal()
 
-    user = UserModel(**data)
+    if data.get("username"):
+        user = UserModel(username=data["username"], password=data["password"])
+    elif data.get("email"):
+        user = UserModel(email=data["email"], password=data["password"])
+
+
 
     # Validate the data
     password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})"
@@ -189,7 +194,7 @@ def login(data: dict):
     # A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
     # user_secret = generate_secret_key()
     # Generate the access token
-    access_expiration_time = 15 # 15 minutes
+    access_expiration_time = 1 # 1h
     access_token = create_jwt(
         header, 
         {
@@ -200,7 +205,7 @@ def login(data: dict):
     )
 
     # Generate the refresh token
-    refresh_expiration_time = 60 * 24 * 7 # 1 week
+    refresh_expiration_time = 24 # hours
     refresh_token = create_jwt(
         header, 
         {
@@ -215,6 +220,9 @@ def login(data: dict):
     login.nb_logins += 1
 
     token = Token(token=refresh_token, user=storedUser)
+    
+    preference = session.query(Preference).filter(Preference.user_id == storedUser.id).first()
+    preference.locale = data["locale"]
 
     session.add(login)
     session.add(token)
@@ -363,6 +371,10 @@ def update_user_profile_settings(general_preferences: dict, request: Request):
             if not storedUser:
                 raise HTTPException(status_code=400, detail="User does not exist")
 
+            if general_preferences.get("welcomingMessageSize"):
+                if not isinstance(general_preferences["welcomingMessageSize"], int):
+                    raise HTTPException(status_code=400, detail="Welcoming message size must be an integer")
+
             # Update the welcoming message size
             if general_preferences.get("welcomingMessageSize"):
                 storedPreference = session.query(Preference).filter(Preference.user_id == user_id).first()
@@ -378,7 +390,38 @@ def update_user_profile_settings(general_preferences: dict, request: Request):
 
     except Exception as e:
         return {"error": e}
-    
+
+@app.post("/settings/language")
+def update_language_settings(locale: dict, request: Request):
+    try:
+        refresh_token_with_bearer = request.headers["Authorization"]
+        refresh_token = refresh_token_with_bearer.split(" ")[1]
+
+        refresh_token_payload = check_access(refresh_token, SECRET_KEY)
+
+        if refresh_token_payload:
+            user_id = refresh_token_payload["user_id"]
+
+            session = SessionLocal()
+            storedUser = session.query(User).filter(User.id == user_id).first()
+            if not storedUser:
+                raise HTTPException(status_code=400, detail="User does not exist")
+
+            # Update the locale
+            if locale.get("locale"):
+                storedPreference = session.query(Preference).filter(Preference.user_id == user_id).first()
+                storedPreference.locale = locale["locale"]
+
+            session.commit()
+            session.close()
+
+            return {
+                "message": "User language settings updated successfully",
+                "is_updated": True
+            }
+
+    except Exception as e:
+        return {"error": e}
 
 # Server running 
 if __name__ == "__main__ ":
