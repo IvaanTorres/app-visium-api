@@ -13,6 +13,12 @@ from .db.schemas.Login import Login
 from .db.schemas.Preference import Preference
 from .db.config import SessionLocal, engine, Base
 from fastapi.responses import JSONResponse
+from datetime import datetime
+
+# A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
+# Since I am not able to access for the specific user secret key, I'll use the same for everyone.
+# However, it's not a good practice to do so.
+user_secret = 'test'
 
 # Create the FastAPI instance
 app = FastAPI()
@@ -55,7 +61,7 @@ def register(data: dict):
 
     # Generate the secret key for both tokens
     # A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
-    user_secret = generate_secret_key()
+    # user_secret = generate_secret_key()
     # Generate the access token
     access_expiration_time = 15 # 15 minutes
     access_token = create_jwt(
@@ -94,8 +100,14 @@ def register(data: dict):
 
     return {
         "message": "User registered successfully",
-        "access_token": access_token,
-        "refresh_token": refresh_token
+        "access_token": {
+            "token": access_token,
+            "expires_in": calculate_future_time(access_expiration_time)
+        },
+        "refresh_token": {
+            "token": refresh_token,
+            "expires_in": calculate_future_time(refresh_expiration_time)
+        }
     }
 
 # Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
@@ -145,7 +157,7 @@ def login(data: dict):
 
     # Generate the secret key for both tokens
     # A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
-    user_secret = generate_secret_key()
+    # user_secret = generate_secret_key()
     unique_identifier = user.username or user.email
     # Generate the access token
     access_expiration_time = 15 # 15 minutes
@@ -182,8 +194,14 @@ def login(data: dict):
 
     return {
         "message": "User logged in successfully",
-        "access_token": access_token,
-        "refresh_token": refresh_token
+        "access_token": {
+            "token": access_token,
+            "expires_in": calculate_future_time(access_expiration_time)
+        },
+        "refresh_token": {
+            "token": refresh_token,
+            "expires_in": calculate_future_time(refresh_expiration_time)
+        }
     }
 
 # Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
@@ -218,6 +236,78 @@ def logout(request: Request):
     })
     response.delete_cookie(key="x-refresh-token")  # Clear the cookie
     return response
+
+@app.post("/delete-account")
+def delete_account(request: Request):
+    try:
+        # access_token = request.headers["Authorization"]
+        # print(request.headers["Authorization"])
+        check_access('access_token')
+
+        # if check_access(access_token) != True:
+            # raise HTTPException(status_code=400, detail="Access token is invalid")
+    #     session = SessionLocal()
+    #     storedUser = session.query(User).filter(User.id == user_id).first()
+    #     if not storedUser:
+    #         raise HTTPException(status_code=400, detail="User does not exist")
+
+    #     # Get tokens linked to user
+    #     storedTokens = session.query(Token).filter(Token.user_id == user_id).all()
+    #     for token in storedTokens:
+    #         session.delete(token)
+
+    #     # Get login linked to user
+    #     storedLogin = session.query(Login).filter(Login.user_id == user_id).first()
+    #     session.delete(storedLogin)
+
+    #     # Get preference linked to user
+    #     storedPreference = session.query(Preference).filter(Preference.user_id == user_id).first()
+    #     session.delete(storedPreference)
+
+    #     session.delete(storedUser)
+    #     session.commit()
+    #     session.close()
+    except Exception as e:
+        return {"error": e}
+
+    return {
+        "message": "User deleted successfully",
+        "is_deleted": True
+    }
+
+def check_access(access_token: str):
+    current_time = datetime.utcnow()
+    # Create an expired date
+    expiration_time = current_time + datetime.timedelta(minutes=0)
+
+    expiration_time = expiration_time.strftime('%Y-%m-%dT%H:%M:%S.%fZ')  # Convert to ISO 8601 format
+    new_token = create_jwt(
+        header,
+        {
+            "sub": "test",
+            "exp": expiration_time
+        },
+        user_secret
+    )
+
+    print(new_token)
+
+    validated = validate_jwt(new_token, user_secret)
+    print('isokay?', validated)
+
+    # try:
+    #     if not access_token:
+    #         raise HTTPException(status_code=400, detail="Token is required")
+    # except Exception as e:
+    #     return {"error": e}
+    
+    # # Validate the token
+    # try:
+    #     print(access_token, user_secret)
+    #     response = validate_jwt(access_token, user_secret)
+    #     # print(response)
+    # except Exception as e:
+    #     return {"error": e}
 
 
 # Server running 

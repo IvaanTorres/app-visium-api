@@ -2,7 +2,7 @@ import hmac
 import base64
 import json
 import hashlib
-import datetime
+from datetime import datetime
 from typing import Dict
 
 def encode_base64(data: bytes) -> str:
@@ -25,32 +25,45 @@ def create_jwt(header: Dict, payload: Dict, secret: str) -> str:
     return jwt
 
 def validate_jwt(token, secret):
-  try:
-      # Split the token into its header and payload
-      header_base64, payload_base64, signature = token.split(".")
+    try:
+        # Split the token into its header and payload
+        header_base64, payload_base64, signature = token.split(".")
 
-      # Decode the header and payload
-      header = json.loads(base64.urlsafe_b64decode(header_base64 + "==").decode("utf-8"))
-      payload = json.loads(base64.urlsafe_b64decode(payload_base64 + "==").decode("utf-8"))
-      # Verify the signature
-      encoded_signature_input = f"{header_base64}.{payload_base64}"
-      expected_signature = generate_jwt_signature(secret, encoded_signature_input)
-      actual_signature = base64.urlsafe_b64decode(signature + "==")
+        # Decode the header and payload
+        header = json.loads(base64.urlsafe_b64decode(header_base64 + "==").decode("utf-8"))
+        payload = json.loads(base64.urlsafe_b64decode(payload_base64 + "==").decode("utf-8"))
+        # Verify the signature
+        encoded_signature_input = f"{header_base64}.{payload_base64}"
+        expected_signature = generate_jwt_signature(secret, encoded_signature_input)
+        print("Expected signature", expected_signature)
+        actual_signature = base64.urlsafe_b64decode(signature + "==")
+
+        if not hmac.compare_digest(expected_signature.encode('utf-8'), actual_signature):
+            print("Invalid signature")
+            return False
+        
+        print("Valid signature", payload.get("exp"))
+
+        # Check expiration
+        current_time = datetime.utcnow()
+        # Convert the first datetime string to a datetime object
+        # datetime_obj_1 = datetime.strptime(current_time, "%Y-%m-%d %H:%M:%S.%f")
+
+        # Convert the second datetime string to a datetime object
+        # Remove the trailing 'Z' and parse the string
+        datetime_obj = datetime.strptime(payload.get("exp")[:-1], "%Y-%m-%dT%H:%M:%S.%f")
+
+        print("Current time", datetime_obj)
 
 
-      if not hmac.compare_digest(expected_signature.encode('utf-8'), actual_signature):
-          print("Invalid signature")
-          return False
-      
-      print("Valid signature")
+        # if payload.get("exp"):
+        #     print("Checking expiration")
+        #     expiration_time = datetime.fromtimestamp(current_time)
+        #     if current_time > expiration_time:
+        #         print("Token has expired")
+        #         return False
 
-      # Check expiration
-      current_time = datetime.datetime.utcnow()
-      if payload.get("exp") and current_time > datetime.datetime.fromtimestamp(payload["exp"]):
-          print("Token has expired")
-          return False
-
-      return True
-  except:
-      print("Invalid token")
-      return False
+        return True
+    except:
+        int("Invalid token")
+        return False
