@@ -16,4 +16,5 @@ def hash(text: str, salt: str = None) -> str:
 def validate_hash(text: str, stored_hashed_password: str) -> bool:
     stored_salt, hashed_password = stored_hashed_password.split('$')
     hashed_input_password = hash(text, stored_salt)
+    print(hashed_input_password, stored_hashed_password)
     return hashed_input_password == stored_hashed_password

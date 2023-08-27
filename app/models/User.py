@@ -1,7 +1,5 @@
-from pydantic import BaseModel
-from typing import Optional
-
-class RegistrationData(BaseModel):
-    username: str
-    password: str
-    email: str
+class UserModel:
+    def __init__(self, password: str, username: str = None,  email: str = None):
+        self.username = username
+        self.password = password
+        self.email = email
