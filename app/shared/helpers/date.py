@@ -2,6 +2,6 @@ import datetime
 
 def calculate_future_time(duration: int):
     current_time = datetime.datetime.utcnow()
-    expiration_time = current_time + datetime.timedelta(minutes=duration)
+    expiration_time = current_time + datetime.timedelta(hours=duration)
 
-    return expiration_time.strftime('%Y-%m-%dT%H:%M:%S.%fZ')  # Convert to ISO 8601 format
+    return int(expiration_time.timestamp())

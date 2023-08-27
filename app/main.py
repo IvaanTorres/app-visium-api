@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request
 import uvicorn
-from .shared.helpers.jwt import create_jwt, validate_jwt
+from .shared.helpers.jwt import create_jwt, validate_jwt, check_access
 from .shared.helpers.hash import hash, validate_hash, createSalt
 from .shared.helpers.secrets import generate_secret_key
 from .shared.constants.jwt import header
@@ -13,6 +13,13 @@ from .db.schemas.Login import Login
 from .db.schemas.Preference import Preference
 from .db.config import SessionLocal, engine, Base
 from fastapi.responses import JSONResponse
+import datetime
+
+# A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
+# Since I am not able to access for the specific user secret key from those services, I'll use the same for everyone.
+# However, it's not a good practice to do so.
+# It'd be better to fetch the user's secret key from the secrets management system and use it to generate the tokens.
+SECRET_KEY = generate_secret_key()
 
 # Create the FastAPI instance
 app = FastAPI()
@@ -53,18 +60,24 @@ def register(data: dict):
     salt = createSalt(16)
     hashed_password = hash(userModel.password, salt)
 
+    # Set and store the user data, their token, their preferences, and their login count
+    user = User(username=userModel.username, password=hashed_password, email=userModel.email)
+    session.add(user)
+    session.commit()
+
+    stored_user = session.query(User).filter(User.username == userModel.username).first()
     # Generate the secret key for both tokens
     # A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
-    user_secret = generate_secret_key()
+    # user_secret = generate_secret_key()
     # Generate the access token
     access_expiration_time = 15 # 15 minutes
     access_token = create_jwt(
         header, 
         {
-            "sub": userModel.username, 
+            "user_id": stored_user.id, 
             "exp": calculate_future_time(access_expiration_time)
         }, 
-        user_secret
+        SECRET_KEY
     )
 
     # Generate the refresh token
@@ -72,20 +85,16 @@ def register(data: dict):
     refresh_token = create_jwt(
         header, 
         {
-            "sub": userModel.username, 
+            "user_id": stored_user.id, 
             "exp": calculate_future_time(refresh_expiration_time)
         }, 
-        user_secret
+        SECRET_KEY
     )
 
-    # Set and store the user data, their token, their preferences, and their login count
-    user = User(username=userModel.username, password=hashed_password, email=userModel.email)
     token = Token(token=refresh_token, user=user)
     login = Login(nb_logins=1, user=user)
     # TODO: Get the user's locale from the request (manage the UI select state)
     preference = Preference(locale="en_EN", user=user)
-
-    session.add(user)
     session.add(token)
     session.add(login)
     session.add(preference)
@@ -94,8 +103,14 @@ def register(data: dict):
 
     return {
         "message": "User registered successfully",
-        "access_token": access_token,
-        "refresh_token": refresh_token
+        "access_token": {
+            "token": access_token,
+            "expires_in": calculate_future_time(access_expiration_time)
+        },
+        "refresh_token": {
+            "token": refresh_token,
+            "expires_in": calculate_future_time(refresh_expiration_time)
+        }
     }
 
 # Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
@@ -145,17 +160,16 @@ def login(data: dict):
 
     # Generate the secret key for both tokens
     # A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
-    user_secret = generate_secret_key()
-    unique_identifier = user.username or user.email
+    # user_secret = generate_secret_key()
     # Generate the access token
     access_expiration_time = 15 # 15 minutes
     access_token = create_jwt(
         header, 
         {
-            "sub": unique_identifier, 
-            "exp": calculate_future_time(access_expiration_time)
+            "user_id": storedUser.id, 
+            "exp": calculate_future_time(access_expiration_time),
         }, 
-        user_secret
+        SECRET_KEY
     )
 
     # Generate the refresh token
@@ -163,10 +177,10 @@ def login(data: dict):
     refresh_token = create_jwt(
         header, 
         {
-            "sub": unique_identifier, 
+            "user_id": storedUser.id, 
             "exp": calculate_future_time(refresh_expiration_time)
         }, 
-        user_secret
+        SECRET_KEY
     )
 
     # +1 to the loggin count and add the refresh token
@@ -182,8 +196,14 @@ def login(data: dict):
 
     return {
         "message": "User logged in successfully",
-        "access_token": access_token,
-        "refresh_token": refresh_token
+        "access_token": {
+            "token": access_token,
+            "expires_in": calculate_future_time(access_expiration_time)
+        },
+        "refresh_token": {
+            "token": refresh_token,
+            "expires_in": calculate_future_time(refresh_expiration_time)
+        }
     }
 
 # Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
@@ -219,6 +239,45 @@ def logout(request: Request):
     response.delete_cookie(key="x-refresh-token")  # Clear the cookie
     return response
 
+# Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
+@app.post("/delete-account")
+def delete_account(request: Request):
+    try:
+        access_token = request.headers["Authorization"]
+        access_token_payload = check_access(access_token, SECRET_KEY)
+
+        if access_token_payload:
+            user_id = access_token_payload["user_id"]
+
+            session = SessionLocal()
+            storedUser = session.query(User).filter(User.id == user_id).first()
+            if not storedUser:
+                raise HTTPException(status_code=400, detail="User does not exist")
+
+            # Delete tokens (sessions) linked to user
+            storedTokens = session.query(Token).filter(Token.user_id == user_id).all()
+            for token in storedTokens:
+                session.delete(token)
+
+            # Delete the login records linked to user
+            storedLogin = session.query(Login).filter(Login.user_id == user_id).first()
+            session.delete(storedLogin)
+
+            # Delete the preferences linked to user
+            storedPreference = session.query(Preference).filter(Preference.user_id == user_id).first()
+            session.delete(storedPreference)
+
+            session.delete(storedUser)
+            session.commit()
+            session.close()
+
+
+            return {
+                "message": "User deleted successfully",
+                "is_deleted": True
+            }
+    except Exception as e:
+        return {"error": e}
 
 # Server running 
 if __name__ == "__main__ ":
