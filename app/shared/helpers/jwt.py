@@ -2,8 +2,11 @@ import hmac
 import base64
 import json
 import hashlib
-from datetime import datetime
+import datetime
 from typing import Dict
+from fastapi import HTTPException
+from ...db.schemas.Token import Token
+from ...db.config import SessionLocal, engine, Base
 
 def encode_base64(data: bytes) -> str:
     base64_bytes = base64.urlsafe_b64encode(data)
@@ -40,17 +43,51 @@ def validate_jwt(token, secret):
 
         if not hmac.compare_digest(expected_signature.encode('utf-8'), actual_signature):
             print("Invalid signature")
-            return False
+            return {
+                "validated": False,
+                "payload": None,
+                "is_revoked": False
+            }
         
-        print("Valid signature")
+        # Check if token is revoked
+        user_id = payload.get("user_id")
+        if user_id:
+            db = SessionLocal()
+            linked_token = db.query(Token).filter(Token.user_id == user_id).first()
+            db.close()
+            if linked_token.is_revoked:
+                print("Token has been revoked")
+                return {
+                    "validated": False,
+                    "payload": None,
+                    "is_revoked": True
+                }
 
         # Check expiration
         current_time = datetime.datetime.utcnow()
         if payload.get("exp") and current_time > datetime.datetime.fromtimestamp(payload["exp"]):
             print("Token has expired")
-            return False
-
-        return True
+            return {
+                "validated": False,
+                "payload": None,
+                "is_revoked": False
+            }
+        
+        return {
+            "validated": True,
+            "payload": payload,
+            "is_revoked": False
+        }
     except:
         print("Invalid token")
-        return False
+        return {
+            "validated": False,
+            "payload": None,
+            "is_revoked": False
+        }
+    
+def check_access(access_token: str, secret: str):
+    validation = validate_jwt(access_token, secret)
+    if not validation["validated"]:
+        raise HTTPException(status_code=401, detail="Not authorized")
+    return validation["payload"]
