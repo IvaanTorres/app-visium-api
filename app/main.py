@@ -239,10 +239,32 @@ def logout(request: Request):
 
 @app.post("/delete-account")
 def delete_account(request: Request):
-    try:
+
+    current_time = datetime.utcnow()
+    expiration_time = current_time + timedelta(hours=15)
+
+    header = {
+        "alg": "HS256", 
+        "typ": "JWT"     
+    }
+    payload = {
+        "sub": "user123",
+        "exp": int(expiration_time.timestamp())
+    }
+
+    # IMPORTANT: Store the random secret into secure secrets management system or a secure database as HashiCorp Vault, AWS Secrets Manager, or a secure database
+    secret = generate_secret_key()
+    jwt = create_jwt(header, payload, secret)
+    validated_jwt = validate_jwt(jwt, secret)
+
+    return {
+        "jwt": jwt,
+        "validated_jwt": validated_jwt
+    }
+    # try:
         # access_token = request.headers["Authorization"]
         # print(request.headers["Authorization"])
-        check_access('access_token')
+        
 
         # if check_access(access_token) != True:
             # raise HTTPException(status_code=400, detail="Access token is invalid")
@@ -267,47 +289,13 @@ def delete_account(request: Request):
     #     session.delete(storedUser)
     #     session.commit()
     #     session.close()
-    except Exception as e:
-        return {"error": e}
+    # except Exception as e:
+    #     return {"error": e}
 
     return {
         "message": "User deleted successfully",
         "is_deleted": True
     }
-
-def check_access(access_token: str):
-    current_time = datetime.utcnow()
-    expiration_time = current_time + timedelta(minutes=0)
-
-    secret = generate_secret_key()
-
-    new_token = create_jwt(
-        header,
-        {
-            "sub": "test",
-            "exp": int(expiration_time.timestamp())
-        },
-        secret
-    )
-
-    validated = validate_jwt(new_token, secret)
-
-    # print('isokay?', validated)
-    print('validated', validated)
-
-    # try:
-    #     if not access_token:
-    #         raise HTTPException(status_code=400, detail="Token is required")
-    # except Exception as e:
-    #     return {"error": e}
-    
-    # # Validate the token
-    # try:
-    #     print(access_token, user_secret)
-    #     response = validate_jwt(access_token, user_secret)
-    #     # print(response)
-    # except Exception as e:
-    #     return {"error": e}
 
 
 # Server running 
