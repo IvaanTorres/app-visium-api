@@ -14,6 +14,8 @@ from .db.schemas.Preference import Preference
 from .db.config import SessionLocal, engine, Base
 from fastapi.responses import JSONResponse
 import datetime
+import re
+from fastapi.middleware.cors import CORSMiddleware
 
 # A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
 # Since I am not able to access for the specific user secret key from those services, I'll use the same for everyone.
@@ -23,6 +25,21 @@ SECRET_KEY = generate_secret_key()
 
 # Create the FastAPI instance
 app = FastAPI()
+
+origins = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
 
 # Run migrations
 Base.metadata.create_all(bind=engine)
@@ -35,6 +52,11 @@ def register(data: dict):
     userModel = UserModel(**data)
 
     # Validate the data
+    password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})"
+    user_pattern = r"^[a-zA-Z0-9_.]{3,20}$"
+    email_pattern = r"\S+@\S+\.\S+"
+
+    print(userModel.username, userModel.password, userModel.email)
     try:
         if not userModel.username:
             raise HTTPException(status_code=400, detail="Username is required")
@@ -46,11 +68,11 @@ def register(data: dict):
             raise HTTPException(status_code=400, detail="Username already exists")
         if session.query(User).filter(User.email == userModel.email).first():
             raise HTTPException(status_code=400, detail="Email already exists")
-        if any(char in userModel.username for char in "<>&%${}'\"\\/()"):
+        if not re.match(user_pattern, userModel.username):
             raise HTTPException(status_code=400, detail="Username contains invalid characters")
-        if any(char in userModel.password for char in "<>&%${}'\"\\/()"):
+        if not re.match(password_pattern, userModel.password):
             raise HTTPException(status_code=400, detail="Password contains invalid characters")
-        if any(char in userModel.email for char in "<>&%${}'\"\\/()"):
+        if not re.match(email_pattern, userModel.email):
             raise HTTPException(status_code=400, detail="Email contains invalid characters")
         
     except Exception as e:
@@ -121,16 +143,21 @@ def login(data: dict):
     user = UserModel(**data)
 
     # Validate the data
+    password_pattern = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*])(?=.{8,})"
+    user_pattern = r"^[a-zA-Z0-9_.]{3,20}$"
+    email_pattern = r"\S+@\S+\.\S+"
+
+    print(user.username, user.password, user.email)
     try:
         if not user.username and not user.email:
             raise HTTPException(status_code=400, detail="Username or email is required")
         if not user.password:
             raise HTTPException(status_code=400, detail="Password is required")
-        if user.username and any(char in user.username for char in "<>&%${}'\"\\/()"):
+        if user.username and not re.match(user_pattern, user.username):
             raise HTTPException(status_code=400, detail="Username contains invalid characters")
-        if any(char in user.password for char in "<>&%${}'\"\\/()"):
+        if not re.match(password_pattern, user.password):
             raise HTTPException(status_code=400, detail="Password contains invalid characters")
-        if user.email and any(char in user.email for char in "<>&%${}'\"\\/()"):
+        if user.email and not re.match(email_pattern, user.email):
             raise HTTPException(status_code=400, detail="Email contains invalid characters")
         
         # Check if the user or email exists
@@ -209,7 +236,9 @@ def login(data: dict):
 # Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
 @app.post("/logout")
 def logout(request: Request):
-    refresh_token = request.cookies.get("x-refresh-token")
+    # refresh_token = request.cookies.get("x-refresh-token")
+    refresh_token_with_bearer = request.headers["Authorization"]
+    refresh_token = refresh_token_with_bearer.split(" ")[1]
 
     try:
         if not refresh_token:
@@ -224,9 +253,8 @@ def logout(request: Request):
         if not storedToken:
             raise HTTPException(status_code=400, detail="Token does not exist")
 
-        storedToken.revoked = True
+        storedToken.is_revoked = 1
 
-        session.add(storedToken)
         session.commit()
         session.close()
     except Exception as e:
