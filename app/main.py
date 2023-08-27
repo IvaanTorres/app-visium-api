@@ -279,17 +279,21 @@ def check_access(access_token: str):
     current_time = datetime.utcnow()
     expiration_time = current_time + timedelta(minutes=0)
 
+    secret = generate_secret_key()
+
     new_token = create_jwt(
         header,
         {
             "sub": "test",
             "exp": int(expiration_time.timestamp())
         },
-        user_secret
+        secret
     )
 
-    validated = validate_jwt(new_token, user_secret)
-    print('isokay?', validated)
+    validated = validate_jwt(new_token, secret)
+
+    # print('isokay?', validated)
+    print('validated', validated)
 
     # try:
     #     if not access_token:
