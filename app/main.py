@@ -271,8 +271,10 @@ def logout(request: Request):
 @app.post("/delete-account")
 def delete_account(request: Request):
     try:
-        access_token = request.headers["Authorization"]
-        access_token_payload = check_access(access_token, SECRET_KEY)
+        refresh_token_with_bearer = request.headers["Authorization"]
+        refresh_token = refresh_token_with_bearer.split(" ")[1]
+
+        access_token_payload = check_access(refresh_token, SECRET_KEY)
 
         if access_token_payload:
             user_id = access_token_payload["user_id"]
@@ -306,6 +308,48 @@ def delete_account(request: Request):
             }
     except Exception as e:
         return {"error": e}
+
+# Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
+# IMPORTANT: I am treating the username as a full user dictionary since the user settings should be a separated settings group in a real application.
+@app.post("/settings/profile")
+def update_user_profile_settings(user: dict, request: Request):
+    try:
+        refresh_token_with_bearer = request.headers["Authorization"]
+        refresh_token = refresh_token_with_bearer.split(" ")[1]
+
+        refresh_token_payload = check_access(refresh_token, SECRET_KEY)
+
+        if refresh_token_payload:
+            user_id = refresh_token_payload["user_id"]
+
+            session = SessionLocal()
+            storedUser = session.query(User).filter(User.id == user_id).first()
+            if not storedUser:
+                raise HTTPException(status_code=400, detail="User does not exist")
+
+            # Check that the username is not taken
+            if user.get("username"):
+                if session.query(User).filter(User.username == user["username"]).first():
+                    raise HTTPException(status_code=400, detail="Username already exists")
+            
+            # Update the username
+            if user.get("username"):
+                storedUser.username = user["username"]
+
+            session.commit()
+            session.close()
+
+            return {
+                "message": "User profile updated successfully",
+                "is_updated": True
+            }
+
+    except Exception as e:
+        return {"error": e}
+
+# @app.post("/settings/general")
+# def update_user_profile_settings:
+#     pass
 
 # Server running 
 if __name__ == "__main__ ":
