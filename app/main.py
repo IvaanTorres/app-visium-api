@@ -96,6 +96,96 @@ def register(data: dict):
         "refresh_token": refresh_token
     }
 
+# Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
+@app.post("/login")
+def login(data: dict):
+    session = SessionLocal()
+
+    user = UserModel(**data)
+
+    # Validate the data
+    try:
+        if not user.username and not user.email:
+            raise HTTPException(status_code=400, detail="Username or email is required")
+        if not user.password:
+            raise HTTPException(status_code=400, detail="Password is required")
+        if user.username and any(char in user.username for char in "<>&%${}'\"\\/()"):
+            raise HTTPException(status_code=400, detail="Username contains invalid characters")
+        if any(char in user.password for char in "<>&%${}'\"\\/()"):
+            raise HTTPException(status_code=400, detail="Password contains invalid characters")
+        if user.email and any(char in user.email for char in "<>&%${}'\"\\/()"):
+            raise HTTPException(status_code=400, detail="Email contains invalid characters")
+        
+        # Check if the user or email exists
+        if user.username:
+            if not session.query(User).filter(User.username == user.username).first():
+                raise HTTPException(status_code=400, detail="Username does not exist")
+        if user.email:
+            if not session.query(User).filter(User.email == user.email).first():
+                raise HTTPException(status_code=400, detail="Email does not exist")
+        
+    except Exception as e:
+        return {"error": e}
+    
+    storedUser = None
+    if user.username:
+        storedUser = session.query(User).filter(User.username == user.username).first()
+    if user.email:
+        storedUser = session.query(User).filter(User.email == user.email).first()
+    
+    # Verify the password
+    try: 
+        is_valid = validate_hash(user.password, storedUser.password)
+        if not is_valid:
+            raise HTTPException(status_code=400, detail="Password is invalid")
+    except Exception as e:
+        return {"error": e}
+
+    # Generate the secret key for both tokens
+    # A good improvement would be to store the secret key in a secure secrets management system as HashiCorp Vault, AWS Secrets Manager, or a secure database
+    user_secret = generate_secret_key()
+    unique_identifier = user.username or user.email
+    # Generate the access token
+    access_expiration_time = 15 # 15 minutes
+    access_token = create_jwt(
+        header, 
+        {
+            "sub": unique_identifier, 
+            "exp": calculate_future_time(access_expiration_time)
+        }, 
+        user_secret
+    )
+
+    # Generate the refresh token
+    refresh_expiration_time = 60 * 24 * 7 # 1 week
+    refresh_token = create_jwt(
+        header, 
+        {
+            "sub": unique_identifier, 
+            "exp": calculate_future_time(refresh_expiration_time)
+        }, 
+        user_secret
+    )
+
+    # +1 to the loggin count and add the refresh token
+    login = session.query(Login).filter(Login.user_id == storedUser.id).first()
+    login.nb_logins += 1
+
+    token = Token(token=refresh_token, user=storedUser)
+
+    session.add(login)
+    session.add(token)
+    session.commit()
+    session.close()
+
+    return {
+        "message": "User logged in successfully",
+        "access_token": access_token,
+        "refresh_token": refresh_token
+    }
+
+
+
 # Server running 
 if __name__ == "__main__ ":
     uvicorn.run(app, host="0.0.0.0", port=8000)
