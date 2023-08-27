@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 import uvicorn
 from .shared.helpers.jwt import create_jwt, validate_jwt
 from .shared.helpers.hash import hash, validate_hash, createSalt
@@ -6,11 +6,13 @@ from .shared.helpers.secrets import generate_secret_key
 from .shared.constants.jwt import header
 from .shared.helpers.date import calculate_future_time
 from .models.User import UserModel
+from .models.Token import TokenModel
 from .db.schemas.User import User
 from .db.schemas.Token import Token
 from .db.schemas.Login import Login
 from .db.schemas.Preference import Preference
 from .db.config import SessionLocal, engine, Base
+from fastapi.responses import JSONResponse
 
 # Create the FastAPI instance
 app = FastAPI()
@@ -184,6 +186,38 @@ def login(data: dict):
         "refresh_token": refresh_token
     }
 
+# Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
+@app.post("/logout")
+def logout(request: Request):
+    refresh_token = request.cookies.get("x-refresh-token")
+
+    try:
+        if not refresh_token:
+            raise HTTPException(status_code=400, detail="Token is required")
+    except Exception as e:
+        return {"error": e}
+    
+    # Revoke the token
+    try:
+        session = SessionLocal()
+        storedToken = session.query(Token).filter(Token.token == refresh_token).first()
+        if not storedToken:
+            raise HTTPException(status_code=400, detail="Token does not exist")
+
+        storedToken.revoked = True
+
+        session.add(storedToken)
+        session.commit()
+        session.close()
+    except Exception as e:
+        return {"error": e}
+
+    response = JSONResponse(content={
+        "message": "Logged out successfully",
+        "is_logged_out": True
+    })
+    response.delete_cookie(key="x-refresh-token")  # Clear the cookie
+    return response
 
 
 # Server running 
