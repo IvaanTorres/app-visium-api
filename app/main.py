@@ -21,7 +21,8 @@ from fastapi.middleware.cors import CORSMiddleware
 # Since I am not able to access for the specific user secret key from those services, I'll use the same for everyone.
 # However, it's not a good practice to do so.
 # It'd be better to fetch the user's secret key from the secrets management system and use it to generate the tokens.
-SECRET_KEY = generate_secret_key()
+# SECRET_KEY = generate_secret_key() # IMPORTANT: Everytime you restart the server, the change of secret will make the active token unusable
+SECRET_KEY = 'my-secret-key'
 
 # Create the FastAPI instance
 app = FastAPI()
@@ -56,24 +57,23 @@ def register(data: dict):
     user_pattern = r"^[a-zA-Z0-9_.]{3,20}$"
     email_pattern = r"\S+@\S+\.\S+"
 
-    print(userModel.username, userModel.password, userModel.email)
     try:
         if not userModel.username:
-            raise HTTPException(status_code=400, detail="Username is required")
+            raise HTTPException(status_code=400, message="Username is required")
         if not userModel.password:
-            raise HTTPException(status_code=400, detail="Password is required")
+            raise HTTPException(status_code=400, message="Password is required")
         if not userModel.email:
-            raise HTTPException(status_code=400, detail="Email is required")
+            raise HTTPException(status_code=400, message="Email is required")
         if session.query(User).filter(User.username == userModel.username).first():
-            raise HTTPException(status_code=400, detail="Username already exists")
+            raise HTTPException(status_code=400, message="Username already exists")
         if session.query(User).filter(User.email == userModel.email).first():
-            raise HTTPException(status_code=400, detail="Email already exists")
+            raise HTTPException(status_code=400, message="Email already exists")
         if not re.match(user_pattern, userModel.username):
-            raise HTTPException(status_code=400, detail="Username contains invalid characters")
+            raise HTTPException(status_code=400, message="Username contains invalid characters")
         if not re.match(password_pattern, userModel.password):
-            raise HTTPException(status_code=400, detail="Password contains invalid characters")
+            raise HTTPException(status_code=400, message="Password contains invalid characters")
         if not re.match(email_pattern, userModel.email):
-            raise HTTPException(status_code=400, detail="Email contains invalid characters")
+            raise HTTPException(status_code=400, message="Email contains invalid characters")
         
     except Exception as e:
         return {"error": e}
@@ -125,13 +125,15 @@ def register(data: dict):
 
     return {
         "message": "User registered successfully",
-        "access_token": {
-            "token": access_token,
-            "expires_in": calculate_future_time(access_expiration_time)
-        },
-        "refresh_token": {
-            "token": refresh_token,
-            "expires_in": calculate_future_time(refresh_expiration_time)
+        "data": {
+            "access_token": {
+                "token": access_token,
+                "expires_in": calculate_future_time(access_expiration_time)
+            },
+            "refresh_token": {
+                "token": refresh_token,
+                "expires_in": calculate_future_time(refresh_expiration_time)
+            }
         }
     }
 
@@ -155,23 +157,23 @@ def login(data: dict):
     print(user.username, user.password, user.email)
     try:
         if not user.username and not user.email:
-            raise HTTPException(status_code=400, detail="Username or email is required")
+            raise HTTPException(status_code=400, message="Username or email is required")
         if not user.password:
-            raise HTTPException(status_code=400, detail="Password is required")
+            raise HTTPException(status_code=400, message="Password is required")
         if user.username and not re.match(user_pattern, user.username):
-            raise HTTPException(status_code=400, detail="Username contains invalid characters")
+            raise HTTPException(status_code=400, message="Username contains invalid characters")
         if not re.match(password_pattern, user.password):
-            raise HTTPException(status_code=400, detail="Password contains invalid characters")
+            raise HTTPException(status_code=400, message="Password contains invalid characters")
         if user.email and not re.match(email_pattern, user.email):
-            raise HTTPException(status_code=400, detail="Email contains invalid characters")
+            raise HTTPException(status_code=400, message="Email contains invalid characters")
         
         # Check if the user or email exists
         if user.username:
             if not session.query(User).filter(User.username == user.username).first():
-                raise HTTPException(status_code=400, detail="Username does not exist")
+                raise HTTPException(status_code=400, message="Username does not exist")
         if user.email:
             if not session.query(User).filter(User.email == user.email).first():
-                raise HTTPException(status_code=400, detail="Email does not exist")
+                raise HTTPException(status_code=400, message="Email does not exist")
         
     except Exception as e:
         return {"error": e}
@@ -186,7 +188,7 @@ def login(data: dict):
     try: 
         is_valid = validate_hash(user.password, storedUser.password)
         if not is_valid:
-            raise HTTPException(status_code=400, detail="Password is invalid")
+            raise HTTPException(status_code=400, message="Password is invalid")
     except Exception as e:
         return {"error": e}
 
@@ -231,13 +233,15 @@ def login(data: dict):
 
     return {
         "message": "User logged in successfully",
-        "access_token": {
-            "token": access_token,
-            "expires_in": calculate_future_time(access_expiration_time)
-        },
-        "refresh_token": {
-            "token": refresh_token,
-            "expires_in": calculate_future_time(refresh_expiration_time)
+        "data": {
+            "access_token": {
+                "token": access_token,
+                "expires_in": calculate_future_time(access_expiration_time)
+            },
+            "refresh_token": {
+                "token": refresh_token,
+                "expires_in": calculate_future_time(refresh_expiration_time)
+            }
         }
     }
 
@@ -250,7 +254,7 @@ def logout(request: Request):
 
     try:
         if not refresh_token:
-            raise HTTPException(status_code=400, detail="Token is required")
+            raise HTTPException(status_code=400, message="Token is required")
     except Exception as e:
         return {"error": e}
     
@@ -259,7 +263,7 @@ def logout(request: Request):
         session = SessionLocal()
         storedToken = session.query(Token).filter(Token.token == refresh_token).first()
         if not storedToken:
-            raise HTTPException(status_code=400, detail="Token does not exist")
+            raise HTTPException(status_code=400, message="Token does not exist")
 
         storedToken.is_revoked = 1
 
@@ -270,13 +274,15 @@ def logout(request: Request):
 
     response = JSONResponse(content={
         "message": "Logged out successfully",
-        "is_logged_out": True
+        "data": {
+            "is_logged_out": True
+        }
     })
-    response.delete_cookie(key="x-refresh-token")  # Clear the cookie
+    # response.delete_cookie(key="x-refresh-token")  # Clear the cookie
     return response
 
 # Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
-@app.post("/delete-account")
+@app.delete("/delete-account")
 def delete_account(request: Request):
     try:
         refresh_token_with_bearer = request.headers["Authorization"]
@@ -290,7 +296,7 @@ def delete_account(request: Request):
             session = SessionLocal()
             storedUser = session.query(User).filter(User.id == user_id).first()
             if not storedUser:
-                raise HTTPException(status_code=400, detail="User does not exist")
+                raise HTTPException(status_code=400, message="User does not exist")
 
             # Delete tokens (sessions) linked to user
             storedTokens = session.query(Token).filter(Token.user_id == user_id).all()
@@ -312,14 +318,16 @@ def delete_account(request: Request):
 
             return {
                 "message": "User deleted successfully",
-                "is_deleted": True
+                "data": {
+                    "is_deleted": True
+                }
             }
     except Exception as e:
         return {"error": e}
 
 # Considering the project requirements, I cannot use Pydantic for input validation and data serialization.
 # IMPORTANT: I am treating the username as a full user dictionary since the user settings should be a separated settings group in a real application.
-@app.post("/settings/profile")
+@app.put("/settings/profile")
 def update_user_profile_settings(user: dict, request: Request):
     try:
         refresh_token_with_bearer = request.headers["Authorization"]
@@ -333,12 +341,12 @@ def update_user_profile_settings(user: dict, request: Request):
             session = SessionLocal()
             storedUser = session.query(User).filter(User.id == user_id).first()
             if not storedUser:
-                raise HTTPException(status_code=400, detail="User does not exist")
+                raise HTTPException(status_code=400, message="User does not exist")
 
             # Check that the username is not taken
             if user.get("username"):
                 if session.query(User).filter(User.username == user["username"]).first():
-                    raise HTTPException(status_code=400, detail="Username already exists")
+                    raise HTTPException(status_code=400, message="Username already exists")
             
             # Update the username
             if user.get("username"):
@@ -349,13 +357,16 @@ def update_user_profile_settings(user: dict, request: Request):
 
             return {
                 "message": "User profile updated successfully",
-                "is_updated": True
+                "data": {
+                    # "email": storedUser.email, # Error ?
+                    "username": user["username"]
+                }
             }
 
     except Exception as e:
         return {"error": e}
 
-@app.post("/settings/general")
+@app.put("/settings/general")
 def update_user_profile_settings(general_preferences: dict, request: Request):
     try:
         refresh_token_with_bearer = request.headers["Authorization"]
@@ -369,11 +380,11 @@ def update_user_profile_settings(general_preferences: dict, request: Request):
             session = SessionLocal()
             storedUser = session.query(User).filter(User.id == user_id).first()
             if not storedUser:
-                raise HTTPException(status_code=400, detail="User does not exist")
+                raise HTTPException(status_code=400, message="User does not exist")
 
             if general_preferences.get("welcomingMessageSize"):
                 if not isinstance(general_preferences["welcomingMessageSize"], int):
-                    raise HTTPException(status_code=400, detail="Welcoming message size must be an integer")
+                    raise HTTPException(status_code=400, message="Welcoming message size must be an integer")
 
             # Update the welcoming message size
             if general_preferences.get("welcomingMessageSize"):
@@ -385,13 +396,15 @@ def update_user_profile_settings(general_preferences: dict, request: Request):
 
             return {
                 "message": "User general preferences updated successfully",
-                "is_updated": True
+                "data": {
+                    "is_updated": True
+                }
             }
 
     except Exception as e:
         return {"error": e}
 
-@app.post("/settings/language")
+@app.put("/settings/language")
 def update_language_settings(locale: dict, request: Request):
     try:
         refresh_token_with_bearer = request.headers["Authorization"]
@@ -405,7 +418,7 @@ def update_language_settings(locale: dict, request: Request):
             session = SessionLocal()
             storedUser = session.query(User).filter(User.id == user_id).first()
             if not storedUser:
-                raise HTTPException(status_code=400, detail="User does not exist")
+                raise HTTPException(status_code=400, message="User does not exist")
 
             # Update the locale
             if locale.get("locale"):
@@ -417,7 +430,9 @@ def update_language_settings(locale: dict, request: Request):
 
             return {
                 "message": "User language settings updated successfully",
-                "is_updated": True
+                "data": {
+                    "is_updated": True
+                }
             }
 
     except Exception as e:
@@ -437,7 +452,7 @@ def get_info_login(request: Request):
             session = SessionLocal()
             storedUser = session.query(User).filter(User.id == user_id).first()
             if not storedUser:
-                raise HTTPException(status_code=400, detail="User does not exist")
+                raise HTTPException(status_code=400, message="User does not exist")
 
             storedLogin = session.query(Login).filter(Login.user_id == user_id).first()
 
@@ -445,7 +460,9 @@ def get_info_login(request: Request):
 
             return {
                 "message": "User login info retrieved successfully",
-                "nb_logins": storedLogin.nb_logins
+                "data": {
+                    "nb_logins": storedLogin.nb_logins
+                }
             }
 
     except Exception as e:
@@ -465,7 +482,7 @@ def get_general_settings(request: Request):
             session = SessionLocal()
             storedUser = session.query(User).filter(User.id == user_id).first()
             if not storedUser:
-                raise HTTPException(status_code=400, detail="User does not exist")
+                raise HTTPException(status_code=400, message="User does not exist")
 
             storedPreference = session.query(Preference).filter(Preference.user_id == user_id).first()
 
@@ -473,7 +490,9 @@ def get_general_settings(request: Request):
 
             return {
                 "message": "User general settings retrieved successfully",
-                "welcomingMessageSize": storedPreference.welcomingMessageSize
+                "data": {
+                    "welcomingMessageSize": storedPreference.welcomingMessageSize,
+                }
             }
 
     except Exception as e:
@@ -493,15 +512,46 @@ def get_language_settings(request: Request):
             session = SessionLocal()
             storedUser = session.query(User).filter(User.id == user_id).first()
             if not storedUser:
-                raise HTTPException(status_code=400, detail="User does not exist")
-
+                raise HTTPException(status_code=400, message="User does not exist")
+        
             storedPreference = session.query(Preference).filter(Preference.user_id == user_id).first()
 
             session.close()
 
             return {
                 "message": "User language settings retrieved successfully",
-                "locale": storedPreference.locale
+                "data": {
+                    "locale": storedPreference.locale
+                }
+            }
+
+    except Exception as e:
+        return {"error": e}
+
+@app.get("/user")
+def get_user(request: Request):
+    try:
+        refresh_token_with_bearer = request.headers["Authorization"]
+        refresh_token = refresh_token_with_bearer.split(" ")[1]
+
+        refresh_token_payload = check_access(refresh_token, SECRET_KEY)
+
+        if refresh_token_payload:
+            user_id = refresh_token_payload["user_id"]
+
+            session = SessionLocal()
+            storedUser = session.query(User).filter(User.id == user_id).first()
+            if not storedUser:
+                raise HTTPException(status_code=400, message="User does not exist")
+
+            session.close()
+
+            return {
+                "message": "User retrieved successfully",
+                "data": {
+                    "username": storedUser.username,
+                    "email": storedUser.email
+                }
             }
 
     except Exception as e:
