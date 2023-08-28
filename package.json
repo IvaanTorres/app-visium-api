@@ -1,6 +1,6 @@
 {
   "name": "app-visium-api",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "App Visium API",
   "main": "index.js",
   "scripts": {

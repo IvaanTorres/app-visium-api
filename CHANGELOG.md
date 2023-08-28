@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.3.0](https://github.com/IvaanTorres/app-visium-api/compare/v0.2.0...v0.3.0) (2023-08-28)
+
+
+### Features
+
+* **general:** change the welcoming message size preferences ([#21](https://github.com/IvaanTorres/app-visium-api/issues/21)) ([f84a6d5](https://github.com/IvaanTorres/app-visium-api/commit/f84a6d59bc2793efbba019922f6b7cf072672dae))
+* **general:** get welcoming message size ([#41](https://github.com/IvaanTorres/app-visium-api/issues/41)) ([da97ad2](https://github.com/IvaanTorres/app-visium-api/commit/da97ad2b43922a1bb41c74595f90eafd3e0f3abf))
+* **infos:** get number of login ([#39](https://github.com/IvaanTorres/app-visium-api/issues/39)) ([56bc656](https://github.com/IvaanTorres/app-visium-api/commit/56bc65622201779d7de7483b6cb8b6126b3c11af))
+* **locale:** get locale ([#40](https://github.com/IvaanTorres/app-visium-api/issues/40)) ([cab8f02](https://github.com/IvaanTorres/app-visium-api/commit/cab8f02b41919504cd49d74339f2d2c2f83c141a))
+* **refresh:** generate new access token ([#25](https://github.com/IvaanTorres/app-visium-api/issues/25)) ([4ce7532](https://github.com/IvaanTorres/app-visium-api/commit/4ce7532d7519b3b3d4b40bbe39a019f206bdac43))
+* **settings:** change language preferences ([#20](https://github.com/IvaanTorres/app-visium-api/issues/20)) ([5ddf2ac](https://github.com/IvaanTorres/app-visium-api/commit/5ddf2ac528bf09fa42e354c0a43a3938b5ac19ee))
+* **settings:** change username ([#22](https://github.com/IvaanTorres/app-visium-api/issues/22)) ([2480ccf](https://github.com/IvaanTorres/app-visium-api/commit/2480ccfda8239d53063bc64d48a912829032ac6f))
+
+
+### Style/Clean up
+
+* **arch:** split files in their respective folders ([#47](https://github.com/IvaanTorres/app-visium-api/issues/47)) ([9b522a2](https://github.com/IvaanTorres/app-visium-api/commit/9b522a266b44c1a586d9f22d75d28b69241c9077))
+* **function-returns:** arrange the function returns to adapt the object types with the ui ([#45](https://github.com/IvaanTorres/app-visium-api/issues/45)) ([347d050](https://github.com/IvaanTorres/app-visium-api/commit/347d050a3228ff10eaed4313dd3e4cc9a50b5c2f))
+
 ## [0.2.0](https://github.com/IvaanTorres/app-visium-api/compare/v0.1.0...v0.2.0) (2023-08-27)
 
 
