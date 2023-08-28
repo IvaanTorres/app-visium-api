@@ -2,7 +2,7 @@
 
 # Installation for dev
 ```bash
-npm run docker:start
+npm run docker:dev
 ```
 
 # Run commands of dependencies (Alembic, etc)
