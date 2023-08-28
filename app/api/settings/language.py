@@ -23,7 +23,7 @@ def update_language_settings(locale: dict, request: Request):
             session = SessionLocal()
             storedUser = session.query(User).filter(User.id == user_id).first()
             if not storedUser:
-                raise HTTPException(status_code=400, message="User does not exist")
+                raise HTTPException(status_code=400, detail="User does not exist")
 
             # Update the locale
             if locale.get("locale"):
@@ -40,8 +40,13 @@ def update_language_settings(locale: dict, request: Request):
                 }
             }
 
-    except Exception as e:
-        return {"error": e}
+    except HTTPException as e:
+        return {
+            "error": {
+                "message": e.detail,
+                "status_code": e.status_code
+            }
+        }
 
 
 @router.get("/settings/language")
@@ -58,7 +63,7 @@ def get_language_settings(request: Request):
             session = SessionLocal()
             storedUser = session.query(User).filter(User.id == user_id).first()
             if not storedUser:
-                raise HTTPException(status_code=400, message="User does not exist")
+                raise HTTPException(status_code=400, detail="User does not exist")
         
             storedPreference = session.query(Preference).filter(Preference.user_id == user_id).first()
 
@@ -71,5 +76,10 @@ def get_language_settings(request: Request):
                 }
             }
 
-    except Exception as e:
-        return {"error": e}
+    except HTTPException as e:
+        return {
+            "error": {
+                "message": e.detail,
+                "status_code": e.status_code
+            }
+        }

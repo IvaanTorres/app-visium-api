@@ -90,5 +90,5 @@ def check_access(access_token: str, secret: str):
     validation = validate_jwt(access_token, secret)
     if not validation["validated"]:
         # Should I revoke the refresh token here ? 
-        raise HTTPException(status_code=401, message="Not authorized")
+        raise HTTPException(status_code=401, detail="Not authorized")
     return validation["payload"]

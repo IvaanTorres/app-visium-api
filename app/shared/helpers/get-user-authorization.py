@@ -16,7 +16,7 @@ def get_user_authorization(secret_key: str, request: Request):
       session = SessionLocal()
       storedUser = session.query(User).filter(User.id == user_id).first()
       if not storedUser:
-          raise HTTPException(status_code=400, message="User does not exist")
+          raise HTTPException(status_code=400, detail="User does not exist")
       
       session.close()
       return storedUser

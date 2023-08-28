@@ -23,7 +23,7 @@ def get_info_login(request: Request):
             session = SessionLocal()
             storedUser = session.query(User).filter(User.id == user_id).first()
             if not storedUser:
-                raise HTTPException(status_code=400, message="User does not exist")
+                raise HTTPException(status_code=400, detail="User does not exist")
 
             storedLogin = session.query(Login).filter(Login.user_id == user_id).first()
 
@@ -36,5 +36,10 @@ def get_info_login(request: Request):
                 }
             }
 
-    except Exception as e:
-        return {"error": e}
+    except HTTPException as e:
+        return {
+            "error": {
+                "message": e.detail,
+                "status_code": e.status_code
+            }
+        }

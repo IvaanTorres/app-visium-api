@@ -22,12 +22,12 @@ def update_user_profile_settings(user: dict, request: Request):
             session = SessionLocal()
             storedUser = session.query(User).filter(User.id == user_id).first()
             if not storedUser:
-                raise HTTPException(status_code=400, message="User does not exist")
+                raise HTTPException(status_code=400, detail="User does not exist")
 
             # Check that the username is not taken
             if user.get("username"):
                 if session.query(User).filter(User.username == user["username"]).first():
-                    raise HTTPException(status_code=400, message="Username already exists")
+                    raise HTTPException(status_code=400, detail="Username already exists")
             
             # Update the username
             if user.get("username"):
@@ -44,5 +44,10 @@ def update_user_profile_settings(user: dict, request: Request):
                 }
             }
 
-    except Exception as e:
-        return {"error": e}
+    except HTTPException as e:
+        return {
+            "error": {
+                "message": e.detail,
+                "status_code": e.status_code
+            }
+        }
