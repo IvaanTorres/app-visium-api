@@ -1,6 +1,8 @@
 # App Visium API 
 
 # Installation for dev
+- Create a .env from the .env.example
+- Run the docker containers
 ```bash
 npm run docker:dev
 ```
@@ -16,7 +18,6 @@ docker exec -it <container-name> <command>
 - Use pipenv where all the dependencies are well managed (+ scripts) instead of the traditional requirements.txt
 - Instead of having a general preferences/settings table, create also the preferencesGroups table and link it. After that, link this same table with a Options table creating a polymorphic relationship/inheritance so there can be several types of options structures for every section/group of settings. This is better for scaling the arch.
 - For bigger projects where there are hundreds of foreign keys, it's better to create different unique table files for them and then, make an order of run.
-- Set up .env variables inside the alembic.ini migrations setup + docker-compose files
 - Instead of using just 1 JWT, use 2 (Access token and refresh token):
     - The refresh token is stored in db and has the ability to let generate access tokens. It can be revoked manually (during logouts, for example). It is stored in the client side part as a httpOnly secure lax/strict cookie so we can check it on server side automatically and don't put it in danger.
     - The access token is stored if possible in memory so everytime we refresh the page, a new acces token will be requested. This is a short life time token (15 min for example unlike the refresh one, which can be much longer).
