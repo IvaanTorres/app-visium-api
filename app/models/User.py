@@ -1,3 +1,4 @@
+# Pydantic is not allowed in the user requirements for data validation, etc
 class UserModel:
     def __init__(self, password: str, username: str = None,  email: str = None):
         self.username = username
